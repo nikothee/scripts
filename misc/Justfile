@@ -1,0 +1,32 @@
+# Lists all available recipes
+[default]
+help:
+    @just --list
+
+red := '\033[1;31m'
+green := '\033[1;32m'
+blue := '\033[94m'
+normal := '\033[0m'
+
+[private]
+log-ok MESSAGE:
+    @echo -e "{{ green }}{{ MESSAGE }}{{ normal }}"
+
+[private]
+log-error MESSAGE:
+    @echo -e "{{ red }}{{ MESSAGE }}{{ normal }}"
+
+[private]
+log-debug MESSAGE:
+    @echo -e "{{ blue }}{{ MESSAGE }}{{ normal }}"
+
+[private]
+ensure COMMAND:
+    @just log-debug "Ensuring {{ COMMAND }} is installed"
+    @command -v "{{ COMMAND }}" || (just log-error "Command not found: {{ COMMAND }}"; exit 127)
+
+#===============================================================================
+
+# TODO: INSERT YOUR RECIPES HERE
+
+#===============================================================================
