@@ -3,12 +3,36 @@
 ACCURACY="15m" # rounds the start time to the nearest 5m, 10m, 15m, 30m, or 60m
 TIMEKEEPING_DIR="$HOME/Documents/0-Timekeeping/" # modify this to your liking
 TIMESHEET_PATH="$TIMEKEEPING_DIR$(date '+%Y-%m.klg')"
-SCP_COMMAND="" # optional scp command to backup the timesheet file to a server
+
+SMB_MOUNT_POINT="$HOME/smb-home" # mount point of the home Samba share; modify this to your setup
+SMB_TIMEKEEPING_DIR="$SMB_MOUNT_POINT/0-Timekeeping/" # matching timekeeping path on the SMB share
+SMB_TIMESHEET_PATH="$SMB_TIMEKEEPING_DIR$(date '+%Y-%m.klg')"
+PENDING_FLAG="$TIMEKEEPING_DIR.pending-smb-sync" # marker left behind when a sync had to be skipped
 
 ###
 
 klog stop --round "$ACCURACY"
 
-$SCP_COMMAND
+# reachable = share is actually mounted (not just an empty/stale mount point) and writable
+if mountpoint -q "$SMB_MOUNT_POINT" 2>/dev/null && [ -d "$SMB_MOUNT_POINT" ]; then
+
+    mkdir -p "$SMB_TIMEKEEPING_DIR"
+
+    if [ -f "$SMB_TIMESHEET_PATH" ] && [ "$SMB_TIMESHEET_PATH" -nt "$TIMESHEET_PATH" ]; then
+        # SMB copy is newer (e.g. edited from another machine while this one was away) - pull it down
+        cp "$SMB_TIMESHEET_PATH" "$TIMESHEET_PATH"
+        echo "SMB copy was newer - pulled it down to $TIMESHEET_PATH"
+    else
+        # local copy is newer, or there's no SMB copy yet - push it up
+        cp "$TIMESHEET_PATH" "$SMB_TIMESHEET_PATH"
+        echo "Synced timesheet to SMB share ($SMB_TIMESHEET_PATH)"
+    fi
+
+    rm -f "$PENDING_FLAG"
+else
+    # away from the home network - can't reach the share, don't block on it
+    touch "$PENDING_FLAG"
+    echo "SMB share unreachable - local changes queued, will sync on the next run at home"
+fi
 
 klog today --diff

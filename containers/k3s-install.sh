@@ -15,8 +15,9 @@ EOF
 
 fi
 
-# install k3s
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik --prefer-bundled-bin --kubelet-arg containerd=/run/k3s/containerd/containerd.sock" sh -s -
+# install k3s (with optional release channel)
+#export INSTALL_K3S_CHANNEL=v1.37
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik --prefer-bundled-bin" sh -s -
 
 # update kubeconfig
 cp "${KUBECONFIG}" "${KUBECONFIG}.old"
