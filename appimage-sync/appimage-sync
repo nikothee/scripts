@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SRC="$HOME/Applications"
+APPS="$HOME/.local/share/applications"
+ICONS="$HOME/.local/share/icons/appimage"
+mkdir -p "$APPS" "$ICONS"
+shopt -s nullglob nocaseglob
+
+# Remove entries whose AppImage is gone
+for d in "$APPS"/appimage-*.desktop; do
+  img=$(sed -n 's/^X-AppImage-Path=//p' "$d")
+  [[ -f "$img" ]] || rm -f "$d"
+done
+
+for img in "$SRC"/*.appimage; do
+  chmod +x "$img"
+  base=$(basename "$img"); id="appimage-${base%.*}"
+  out="$APPS/$id.desktop"
+  [[ "$out" -nt "$img" ]] && continue          # already up to date
+
+  tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+  ( cd "$tmp" && "$img" --appimage-extract '*.desktop' >/dev/null )
+  desk=$(find "$tmp/squashfs-root" -maxdepth 1 -name '*.desktop' | head -n1)
+  [[ -n "$desk" ]] || { echo "no .desktop in $base"; continue; }
+
+  icon=$(sed -n 's/^Icon=//p' "$desk" | head -n1)
+  ( cd "$tmp" && "$img" --appimage-extract "$icon.*" >/dev/null ) || true
+  iconfile=$(find "$tmp/squashfs-root" -maxdepth 1 -name "$icon.*" | head -n1)
+  if [[ -n "$iconfile" ]]; then
+    cp -L "$iconfile" "$ICONS/$id.${iconfile##*.}"
+    iconpath="$ICONS/$id.${iconfile##*.}"
+  else
+    iconpath="$icon"
+  fi
+
+  sed -e "s|^Exec=[^ ]*|Exec=\"$img\"|" \
+      -e "s|^Icon=.*|Icon=$iconpath|" \
+      -e '/^TryExec=/d' "$desk" > "$out"
+  echo "X-AppImage-Path=$img" >> "$out"
+  rm -rf "$tmp"; trap - EXIT
+done
+
+update-desktop-database "$APPS" 2>/dev/null || true

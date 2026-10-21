@@ -1,0 +1,6 @@
+[Path]
+PathChanged=%h/Applications
+Unit=appimage-sync.service
+
+[Install]
+WantedBy=default.target
